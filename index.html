@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Monkey Rescue - Milk Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+        :root { --gold: #FFD700; --milk: #FFFDD0; --chocolate: #4B2E1D; --water: rgba(0, 150, 255, 0.7); }
+        body {
+            margin: 0; background: #000; color: var(--gold);
+            font-family: 'Fredoka One', cursive;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        #ui {
+            width: 92%; background: #1a1a1a; padding: 12px;
+            border: 3px solid var(--gold); border-radius: 15px;
+            display: grid; grid-template-columns: 1fr 1.5fr 1fr;
+            text-align: center; margin-bottom: 10px; z-index: 20;
+        }
+        .val { font-size: 18px; color: #fff; display: block; }
+
+        /* UBAO WA RANGI YA MAZIWA */
+        #game-area {
+            position: relative; width: 95vw; aspect-ratio: 7/8;
+            background: var(--milk); 
+            border: 6px solid var(--chocolate); border-radius: 20px;
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(8, 1fr); gap: 4px; padding: 6px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        #central-tank {
+            grid-area: 3 / 3 / 6 / 6;
+            background: #222; border: 4px solid var(--chocolate); border-radius: 15px;
+            position: relative; overflow: hidden; z-index: 10;
+        }
+        #water {
+            position: absolute; bottom: 0; width: 100%;
+            background: var(--water); transition: height 0.3s linear;
+        }
+
+        #monkey {
+            position: absolute; width: 100%; text-align: center;
+            font-size: 50px; bottom: 5%; z-index: 15;
+            animation: struggle 1.5s infinite ease-in-out;
+        }
+        @keyframes struggle {
+            0%, 100% { transform: translateY(0) rotate(-5deg); }
+            25% { transform: translateY(-12px) scale(1.1); }
+            50% { transform: translateY(0) rotate(5deg); }
+            75% { transform: translateY(-6px) scale(0.95); }
+        }
+
+        .bubble {
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3), inset -3px -3px 6px rgba(0,0,0,0.4);
+            z-index: 5; transition: transform 0.2s, opacity 0.3s;
+        }
+
+        /* Babbles zilizokozwa ili zionekane vizuri kwenye rangi ya maziwa */
+        .c1 { background: radial-gradient(circle at 35% 35%, #ffcc00, #996600); }
+        .c2 { background: radial-gradient(circle at 35% 35%, #ff3333, #800000); }
+        .c3 { background: radial-gradient(circle at 35% 35%, #3399ff, #003366); }
+        .c4 { background: radial-gradient(circle at 35% 35%, #22cc22, #004400); }
+        .c5 { background: radial-gradient(circle at 35% 35%, #ff00ff, #660066); }
+
+        .star {
+            position: absolute; pointer-events: none; width: 10px; height: 10px;
+            background: white; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            z-index: 30; animation: fadeOut 0.8s forwards;
+        }
+        @keyframes fadeOut { to { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; } }
+
+        #feedback {
+            position: absolute; width: 100%; text-align: center;
+            top: 40%; font-size: 40px; text-shadow: 1px 1px 5px #000; z-index: 50;
+            pointer-events: none; opacity: 0; transition: 0.3s ease-out;
+        }
+
+        #menu, #overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.95);
+            z-index: 100; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+        }
+        .btn { padding: 15px 35px; margin-top: 15px; border-radius: 15px; border: none; font-family: 'Fredoka One'; cursor: pointer; font-size: 20px; color: #fff; background: #2196F3; }
+        .lvl-select { background: #333; color: white; border: 2px solid var(--gold); padding: 10px; border-radius: 10px; font-size: 20px; width: 80px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div>LEVEL<span id="lvlDisplay" class="val">1</span></div>
+        <div>SCORE<span id="scoreDisplay" class="val">0/5000</span></div>
+        <div>AIR<span id="airDisplay" class="val">100%</span></div>
+    </div>
+
+    <div id="game-area">
+        <div id="feedback"></div>
+        <div id="central-tank">
+            <div id="water"></div>
+            <div id="monkey">🐒</div>
+        </div>
+    </div>
+
+    <div id="menu">
+        <h1 style="color:var(--gold); font-size: 40px; margin-bottom: 5px;">MONKEY RESCUE</h1>
+        <p>Milk & Chocolate Edition</p>
+        <input type="number" id="startLevel" class="lvl-select" value="1" min="1" max="50">
+        <button class="btn" onclick="startGame()">START MISSION</button>
+    </div>
+
+    <div id="overlay" style="display:none">
+        <h1 id="msg"></h1>
+        <div id="ovBtnArea"></div>
+    </div>
+
+    <script>
+        const gameArea = document.getElementById('game-area'), water = document.getElementById('water'),
+              monkey = document.getElementById('monkey'), scoreDisp = document.getElementById('scoreDisplay'),
+              airDisp = document.getElementById('airDisplay'), lvlDisp = document.getElementById('lvlDisplay'),
+              menu = document.getElementById('menu'), overlay = document.getElementById('overlay'),
+              feedback = document.getElementById('feedback');
+
+        let level = 1, score = 0, targetScore = 5000, waterHeight = 15, grid = [], isRunning = false, timer, startX, startY;
+        const colors = ['c1','c2','c3','c4','c5'];
+        const colorHex = { c1:'#ffd700', c2:'#ff4d4d', c3:'#3399ff', c4:'#44ff44', c5:'#ff33ff' };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playPopSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function ladyVoice(text) {
+            try {
+                if ('speechSynthesis' in window) {
+                    const speech = new SpeechSynthesisUtterance(text);
+                    speech.lang = 'en-US'; speech.pitch = 1.3; speech.rate = 1.0;
+                    window.speechSynthesis.speak(speech);
+                }
+            } catch (e) { }
+        }
+
+        function playSadSong() {
+            if(!isRunning) return;
+            const melody = [220, 196, 174, 164]; 
+            let now = audioCtx.currentTime;
+            melody.forEach((note, i) => {
+                const osc = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(note, now + i * 1.2);
+                g.gain.setValueAtTime(0, now + i * 1.2);
+                g.gain.linearRampToValueAtTime(0.04, now + i * 1.2 + 0.4);
+                g.gain.linearRampToValueAtTime(0, now + i * 1.2 + 1.1);
+                osc.connect(g); g.connect(audioCtx.destination);
+                osc.start(now + i * 1.2); osc.stop(now + i * 1.2 + 1.2);
+            });
+            setTimeout(playSadSong, 5000);
+        }
+
+        function startGame() {
+            level = parseInt(document.getElementById('startLevel').value) || 1;
+            audioCtx.resume();
+            playSadSong();
+            initLevel();
+        }
+
+        function initLevel() {
+            targetScore = 5000 + (level - 1) * 1000;
+            score = 0; waterHeight = 15;
+            menu.style.display = 'none'; overlay.style.display = 'none';
+            isRunning = true;
+            buildBoard();
+            ensureMovesExist(); 
+            updateUI();
+            clearInterval(timer);
+            let speed = Math.max(300, 1100 - (level * 10));
+            timer = setInterval(() => { 
+                if(isRunning) { waterHeight += 0.45; updateUI(); if(waterHeight >= 98) endGame(false); } 
+            }, speed);
+        }
+
+        function buildBoard() {
+            gameArea.querySelectorAll('.bubble').forEach(b => b.remove());
+            grid = [];
+            for(let r=0; r<8; r++) {
+                grid[r] = [];
+                for(let c=0; c<7; c++) {
+                    if(r >= 2 && r <= 4 && c >= 2 && c <= 4) { grid[r][c] = null; continue; }
+                    let validColor;
+                    do { validColor = colors[Math.floor(Math.random() * 5)]; } while (isMatch(r, c, validColor));
+                    const b = document.createElement('div');
+                    b.className = 'bubble ' + validColor;
+                    b.style.gridRow = r + 1; b.style.gridColumn = c + 1;
+                    b.dataset.r = r; b.dataset.c = c;
+                    b.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }, {passive:true});
+                    b.addEventListener('touchend', handleTouch);
+                    gameArea.appendChild(b);
+                    grid[r][c] = b;
+                }
+            }
+        }
+
+        function ensureMovesExist() {
+            let attempts = 0;
+            while (!hasPossibleMoves() && attempts < 25) { shuffleBoard(); attempts++; }
+        }
+
+        function hasPossibleMoves() {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (!grid[r][c]) continue;
+                    if (canSwapMatch(r, c, r, c + 1) || canSwapMatch(r, c, r + 1, c)) return true;
+                }
+            }
+            return false;
+        }
+
+        function canSwapMatch(r1, c1, r2, c2) {
+            if (r2 >= 8 || c2 >= 7 || !grid[r1][c1] || !grid[r2][c2]) return false;
+            let cInit1 = grid[r1][c1].className, cInit2 = grid[r2][c2].className;
+            grid[r1][c1].className = cInit2; grid[r2][c2].className = cInit1;
+            let match = false;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (!grid[r][c]) continue;
+                    let col = grid[r][c].className;
+                    if (c < 5 && grid[r][c+1]?.className === col && grid[r][c+2]?.className === col) match = true;
+                    if (r < 6 && grid[r+1] && grid[r+1][c]?.className === col && grid[r+2] && grid[r+2][c]?.className === col) match = true;
+                }
+            }
+            grid[r1][c1].className = cInit1; grid[r2][c2].className = cInit2;
+            return match;
+        }
+
+        function shuffleBoard() {
+            let currentColors = [];
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<7; c++) { if(grid[r][c]) currentColors.push(grid[r][c].className); }
+            }
+            currentColors.sort(() => Math.random() - 0.5);
+            let i = 0;
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<7; c++) { if(grid[r][c]) grid[r][c].className = currentColors[i++]; }
+            }
+        }
+
+        function isMatch(r, c, col) {
+            if (c >= 2 && grid[r][c-1]?.classList.contains(col) && grid[r][c-2]?.classList.contains(col)) return true;
+            if (r >= 2 && grid[r-1] && grid[r-1][c]?.classList.contains(col) && grid[r-2] && grid[r-2][c]?.classList.contains(col)) return true;
+            return false;
+        }
+
+        function handleTouch(e) {
+            if(!isRunning) return;
+            let dx = e.changedTouches[0].clientX - startX, dy = e.changedTouches[0].clientY - startY;
+            if(Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+            let r = parseInt(e.target.dataset.r), c = parseInt(e.target.dataset.c);
+            let nr = r, nc = c;
+            if(Math.abs(dx) > Math.abs(dy)) nc = dx > 0 ? c+1 : c-1;
+            else nr = dy > 0 ? r+1 : r-1;
+            if(nr >=0 && nr < 8 && nc >= 0 && nc < 7 && grid[nr][nc]) {
+                let b1 = grid[r][c], b2 = grid[nr][nc];
+                let tC = b1.className; b1.className = b2.className; b2.className = tC;
+                if(!checkMatches()) setTimeout(() => { b2.className = b1.className; b1.className = tC; }, 200);
+            }
+        }
+
+        function createStars(element, colorClass) {
+            const rect = element.getBoundingClientRect();
+            const color = colorHex[colorClass] || "#FFF";
+            for(let i=0; i<8; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                s.style.left = (rect.left + rect.width/2) + 'px';
+                s.style.top = (rect.top + rect.height/2) + 'px';
+                s.style.setProperty('--tx', (Math.random()*120 - 60) + 'px');
+                s.style.setProperty('--ty', (Math.random()*120 - 60) + 'px');
+                s.style.background = color;
+                document.body.appendChild(s);
+                setTimeout(() => s.remove(), 800);
+            }
+        }
+
+        function checkMatches() {
+            let matches = new Set();
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<7; c++) {
+                    if(!grid[r][c]) continue;
+                    let col = colors.find(cls => grid[r][c].classList.contains(cls));
+                    if(c < 5 && grid[r][c+1]?.classList.contains(col) && grid[r][c+2]?.classList.contains(col))
+                        [grid[r][c], grid[r][c+1], grid[r][c+2]].forEach(x => matches.add(x));
+                    if(r < 6 && grid[r+1] && grid[r+1][c]?.classList.contains(col) && grid[r+2] && grid[r+2][c]?.classList.contains(col))
+                        [grid[r][c], grid[r+1][c], grid[r+2][c]].forEach(x => matches.add(x));
+                }
+            }
+            if(matches.size > 0) {
+                playPopSound();
+                if(matches.size > 6) { showFeedback("EXCELLENT!!", "#FFD700"); ladyVoice("Excellent"); }
+                else if(matches.size > 3) { showFeedback("VERY GOOD!", "#008000"); ladyVoice("Very Good"); }
+
+                score += matches.size * 30;
+                waterHeight = Math.max(5, waterHeight - (matches.size * 2.5));
+                matches.forEach(b => {
+                    createStars(b, colors.find(c => b.classList.contains(c)));
+                    b.style.opacity = '0'; b.className = 'bubble';
+                });
+                updateUI();
+                if(score >= targetScore) endGame(true);
+                else setTimeout(applyGravity, 300);
+                return true;
+            }
+            return false;
+        }
+
+        function showFeedback(txt, col) {
+            feedback.innerText = txt; feedback.style.color = col;
+            feedback.style.opacity = "1"; feedback.style.transform = "scale(1.2)";
+            setTimeout(() => { feedback.style.opacity = "0"; feedback.style.transform = "scale(1)"; }, 1200);
+        }
+
+        function applyGravity() {
+            for(let c=0; c<7; c++) {
+                for(let r=7; r>=0; r--) {
+                    if(grid[r][c] && grid[r][c].style.opacity === '0') {
+                        let rr = r;
+                        while(rr > 0) {
+                            rr--;
+                            if(grid[rr][c] && grid[rr][c].style.opacity !== '0') {
+                                grid[r][c].className = grid[rr][c].className;
+                                grid[r][c].style.opacity = '1';
+                                grid[rr][c].style.opacity = '0';
+                                grid[rr][c].className = 'bubble';
+                                break;
+                            }
+                        }
+                    }
+                }
+                for(let r=0; r<8; r++) {
+                    if(grid[r][c] && grid[r][c].style.opacity === '0') {
+                        grid[r][c].className = 'bubble ' + colors[Math.floor(Math.random() * 5)];
+                        grid[r][c].style.opacity = '1';
+                    }
+                }
+            }
+            setTimeout(() => { checkMatches(); ensureMovesExist(); }, 300);
+        }
+
+        function updateUI() {
+            water.style.height = waterHeight + "%";
+            scoreDisp.innerText = score + "/" + targetScore;
+            airDisp.innerText = Math.max(0, Math.floor(100 - waterHeight)) + "%";
+            lvlDisp.innerText = level;
+            if(waterHeight > 80) monkey.innerText = "😱";
+            else if(waterHeight > 50) monkey.innerText = "😰";
+            else monkey.innerText = "🐒";
+        }
+
+        function endGame(win) {
+            isRunning = false; clearInterval(timer);
+            overlay.style.display = 'flex';
+            if(win) {
+                msg.innerText = "LEVEL CLEAR! 🥳";
+                ovBtnArea.innerHTML = `<button class="btn" onclick="level++; initLevel()">NEXT LEVEL</button>`;
+            } else {
+                msg.innerText = "GAME OVER! 😵";
+                ladyVoice("Game Over");
+                ovBtnArea.innerHTML = `<button class="btn" style="background:#F44336" onclick="initLevel()">RETRY</button>`;
+            }
+        }
+    </script>
+</body>
+  </html>
+  
